@@ -25,17 +25,18 @@ def get_date_taken(file):
     return date_photo_taken
 
 
-def get_immediate_subdirectories(a_dir):
-    return [os.path.join(a_dir, name) for name in os.listdir(a_dir)
-            if os.path.isdir(os.path.join(a_dir, name))]
-
+def get_directories_to_scan(root_directory):
+    child_directories = [os.path.join(root_directory, name) for name in os.listdir(root_directory)
+                         if os.path.isdir(os.path.join(root_directory, name))]
+    child_directories.append(root_directory)
+    return child_directories
 
 if __name__ == "__main__":
     root_dir = sys.argv[1]
 
     print("Root directory to scan: " + str(root_dir))
 
-    dirs_to_scan = get_immediate_subdirectories(root_dir)
+    dirs_to_scan = get_directories_to_scan(root_dir)
 
     for current_dir in dirs_to_scan:
         print("Scanning " + current_dir)
@@ -62,5 +63,3 @@ if __name__ == "__main__":
             # TODO: Refactor code above into smaller methods
             # TODO: If directory is empty after file is moved, delete the directory (maybe a post run cleanup?)
             # TODO: Locate any files that may remain after organization and move into a junk/review directory
-
-
