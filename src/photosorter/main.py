@@ -3,7 +3,7 @@ import sys
 import os
 from PIL import Image
 from datetime import datetime
-
+from src.photosorter.enums.file_of_type import *
 
 def get_exif_date_time_original(file):
     try:
@@ -21,8 +21,20 @@ def get_directories_to_scan(root_directory):
     return child_directories
 
 
-def get_files_in_directory(scan_directory):
-    return [f for f in os.scandir(scan_directory) if f.name.lower().endswith('.jpg')]
+# TODO: Allow user to pass in a tuple of "image" extensions instead of hard-coding
+# TODO: There has to be a way to not need to have basically the same exact code three times?!
+def get_files_in_directory(scan_directory, files_of_type = FilesOfType.IMAGES):
+    if files_of_type is FilesOfType.NON_IMAGES:
+        files = [f for f in os.scandir(scan_directory)
+                 if (not f.name.lower().endswith('.jpg') and f.is_dir() is False)]
+    elif files_of_type is FilesOfType.IMAGES:
+        files = [f for f in os.scandir(scan_directory)
+                 if (f.name.lower().endswith('.jpg') and f.is_dir() is False)]
+    else:
+        files = [f for f in os.scandir(scan_directory)
+                 if (f.is_dir() is False)]
+
+    return files
 
 
 def get_date_taken(file):
@@ -49,31 +61,59 @@ def move_file(target_directory, file):
         os.rename(file.path, target_directory + '\\' + file.name)
 
 
-if __name__ == "__main__":
-    root_dir = sys.argv[1]
-
-    print("Root directory to scan: " + str(root_dir))
-
+def process_images(root_dir):
     dirs_to_scan = get_directories_to_scan(root_dir)
 
     for current_dir in dirs_to_scan:
 
-        print("Scanning " + current_dir)
+        print("Scanning for images in: " + current_dir)
 
-        files = get_files_in_directory(current_dir)
+        images = get_files_in_directory(current_dir)
 
-        for file in files:
+        for image in images:
 
-            date_photo_taken = get_date_taken(file)
+            date_photo_taken = get_date_taken(image)
 
             target_directory = root_dir + '\\' + str(date_photo_taken.date())
 
-            print(target_directory)
+            create_target_directory(target_directory)
+
+            move_file(target_directory, image)
+
+
+def process_junk(root_dir):
+    dirs_to_scan = get_directories_to_scan(root_dir)
+
+    for current_dir in dirs_to_scan:
+
+        print("Scanning for images in: " + current_dir)
+
+        files = get_files_in_directory(current_dir, False)
+
+        for file in files:
+
+            date_file_created = get_date_taken(file)
+
+            target_directory = root_dir + 'JUNK\\' + str(date_file_created.date())
 
             create_target_directory(target_directory)
 
             move_file(target_directory, file)
 
-            # TODO: Refactor code above into smaller methods
-            # TODO: If directory is empty after file is moved, delete the directory (maybe a post run cleanup?)
-            # TODO: Locate any files that may remain after organization and move into a junk/review directory
+
+def cleanup(root_directory):
+    return False
+
+
+if __name__ == "__main__":
+    root_dir = sys.argv[1]
+
+    print("Root directory to scan: " + str(root_dir))
+
+    process_images()
+
+    process_junk()
+
+    cleanup()
+
+    # TODO: If directory is empty after file is moved, delete the directory (maybe a post run cleanup?)
