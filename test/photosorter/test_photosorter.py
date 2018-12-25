@@ -2,23 +2,27 @@ from test.PseudoDirEntry import PseudoDirEntry
 from src.photosorter.main import *
 from unittest.mock import call, MagicMock
 from datetime import date
+import pytest
 
 
 class TestPhotoSorter:
 
-    def test_get_date_taken__image_has_exif_information__return_valid_date(self, mocker):
-        mocker.patch('src.photosorter.main.get_exif_date_time_original', MagicMock(return_value='2018:11:14 13:42:07'))
+    def test_get_create_date__image_has_exif_information__return_valid_date(self, mocker):
+        mocker.patch('src.photosorter.main.get_jpg_create_date', MagicMock(return_value=date(2018, 11, 14)))
+        mocker.patch('magic.from_file', MagicMock(return_value='image/jpeg'))
 
-        pseudo_dir_entry = PseudoDirEntry('FILENAME.JPG', '/filepath/', False, None)
-        result = get_date_taken(pseudo_dir_entry)
+        pseudo_dir_entry = PseudoDirEntry('FILENAME.JPG', '/filepath/FILENAME.JPG', False, None)
+        result = get_create_date(pseudo_dir_entry)
         assert result == date(2018, 11, 14)
 
-    def test_get_date_taken__image_does_not_have_exif_information__return_valid_date(self, mocker):
-        mocker.patch('src.photosorter.main.get_exif_date_time_original', MagicMock(return_value=None))
-        mocker.patch('os.path.getctime', MagicMock(return_value=1544906140.43639))
+    def test_get_create_date__image_does_not_have_exif_information__return_valid_date(self, mocker):
+        mocked_get_jpg_create_date = mocker.patch('src.photosorter.main.get_jpg_create_date')
+        mocked_get_jpg_create_date.side_effect = KeyError()
+        mocker.patch('src.photosorter.main.get_generic_create_date', MagicMock(return_value=date(2018, 12, 15)))
+        mocker.patch('magic.from_file', MagicMock(return_value='image/jpeg'))
 
-        pseudo_dir_entry = PseudoDirEntry('FILENAME.JPG', '/filepath/', False, None)
-        result = get_date_taken(pseudo_dir_entry)
+        pseudo_dir_entry = PseudoDirEntry('FILENAME.JPG', '/filepath/FILENAME.JPG', False, None)
+        result = get_create_date(pseudo_dir_entry)
         assert result == date(2018, 12, 15)
 
     def test_get_directories_to_scan__add_root_directory__directories_are_found__return_list_of_directories(self, mocker):
@@ -51,17 +55,16 @@ class TestPhotoSorter:
         result = get_directories_to_scan('X:/dirname/test/')
         assert result == []
 
-    def test_get_files_in_directory__images__images_exist__return_list_of_images_only(self, mocker):
+    def test_get_files_in_directory__valid_media__images_exist__return_list_of_images_only(self, mocker):
         file_list = [
             PseudoDirEntry('FILE1.JPG', '/filepath\\FILE1.JPG', False, None),
-            PseudoDirEntry('FILE2.TXT', '/filepath/', False, None),
             PseudoDirEntry('DIRECTORY', '/filepath/', True, None),
-            PseudoDirEntry('FILE3.JPG', '/filepath/', False, None),
-            PseudoDirEntry('file4.png', '/filepath/', False, None),
-            PseudoDirEntry('file5.jpg', '/filepath/', False, None),
-            PseudoDirEntry('file6.jpg', '/filepath\\FILE6.JPG', True, None)
+            PseudoDirEntry('FILE2.JPG', '/filepath/', False, None),
+            PseudoDirEntry('file3.jpg', '/filepath/', False, None),
+            PseudoDirEntry('file4.jpg', '/filepath\\FILE6.JPG', True, None)
         ]
         mocker.patch('os.scandir', MagicMock(return_value=file_list))
+        mocker.patch('magic.from_file', MagicMock(return_value='image/jpeg'))
 
         result = get_files_in_directory("directory_name")
         assert (result.__len__() == 3)
@@ -69,34 +72,33 @@ class TestPhotoSorter:
             assert (file.name.lower().endswith('.jpg'))
             assert (not file.is_dir())
 
-    def test_get_files_in_directory_images__images_do_not_exist__return_empty_list(self, mocker):
+    def test_get_files_in_directory__valid_media__images_do_not_exist__return_empty_list(self, mocker):
         mocker.patch('os.scandir', MagicMock(return_value=[PseudoDirEntry('DIRECTORY', '/filepath/', True, None)]))
+        mocker.patch('magic.from_file', MagicMock(return_value='image/jpeg'))
 
         result = get_files_in_directory("directory_name")
         assert (result.__len__() == 0)
 
-    def test_get_files_in_directory__non_images__non_image_files_exist__return_list_of_non_images_only(self, mocker):
+    def test_get_files_in_directory__non_valid_media__non_valid_media_files_exist__return_list_of_non_images_only(self, mocker):
         file_list = [
-            PseudoDirEntry('FILE1.JPG', '/filepath\\FILE1.JPG', False, None),
-            PseudoDirEntry('FILE2.TXT', '/filepath/', False, None),
+            PseudoDirEntry('FILE1.JPG', '/filepath\\FILE1.JPG', True, None),
             PseudoDirEntry('DIRECTORY', '/filepath/', True, None),
-            PseudoDirEntry('FILE3.JPG', '/filepath/', False, None),
-            PseudoDirEntry('file4.png', '/filepath/', False, None),
-            PseudoDirEntry('file5.jpg', '/filepath/', False, None),
-            PseudoDirEntry('file6.jpg', '/filepath\\FILE6.JPG', True, None)
+            PseudoDirEntry('FILE2.PNG', '/filepath\\FILE2.PNG', False, None)
         ]
         mocker.patch('os.scandir', MagicMock(return_value=file_list))
+        mocker.patch('magic.from_file', MagicMock(return_value='image/png'))
 
-        result = get_files_in_directory("directory_name", FilesOfType.NON_IMAGES)
-        assert (result.__len__() == 2)
+        result = get_files_in_directory("directory_name", FilesOfType.NON_VALID_MEDIA)
+        assert (result.__len__() == 1)
         for file in result:
-            assert (file.name.lower().endswith(('.png', '.txt')))
+            assert (file.name.lower().endswith('.png'))
             assert (not file.is_dir())
 
-    def test_get_files_in_directory__non_images__non_image_files_do_not_exist__return_empty_list(self, mocker):
+    def test_get_files_in_directory__non_valid_media__non_valid_media_files_do_not_exist__return_empty_list(self, mocker):
         mocker.patch('os.scandir', MagicMock(return_value=[PseudoDirEntry('DIRECTORY', '/filepath/', True, None)]))
+        mocker.patch('magic.from_file', MagicMock(return_value='image/png'))
 
-        result = get_files_in_directory("directory_name", FilesOfType.NON_IMAGES)
+        result = get_files_in_directory("directory_name", FilesOfType.NON_VALID_MEDIA)
         assert (result.__len__() == 0)
 
     def test_get_files_in_directory__all_files__files_exist__return_list_of_non_images_only(self, mocker):
@@ -216,7 +218,44 @@ class TestPhotoSorter:
 
         assert (mocked_rmdir.call_count == 0)
 
+    def test_get_directories__no_parameters_supplied__raises_exception(self):
+        with pytest.raises(Exception) as excinfo:
+            root_directory, target_root_directory = get_directories(['arg0'])
+        assert excinfo.value.args[0] == 'Root directory parameter not supplied.'
+
+    def test_get_directories__both_parameters_supplied__both_returned(self):
+        root_directory, target_root_directory = get_directories(['arg0', 'arg1', 'arg2'])
+
+        assert root_directory == 'arg1'
+        assert target_root_directory == 'arg2'
+
+    def test_get_directories__no_target_supplied__root_and_target_are_the_same(self):
+        root_directory, target_root_directory = get_directories(['arg0', 'arg1'])
+
+        assert root_directory == 'arg1'
+        assert target_root_directory == 'arg1'
+
+    def test_validate_directories_exist__root_directory_invalid__exception_thrown(self, mocker):
+        mocker.patch('os.path.isdir', MagicMock(side_effect=[False, False]))
+        root_directory = 'tst1'
+        target_root_directory = 'tst2'
+        with pytest.raises(Exception) as excinfo:
+            validate_directories_exist(root_directory, target_root_directory)
+        assert excinfo.value.args[0] == 'Source directory {0} does not exist!'.format(root_directory)
+
+    def test_validate_directories_exist__target_root_directory_invalid__exception_thrown(self, mocker):
+        mocker.patch('os.path.isdir', MagicMock(side_effect=[True, False]))
+        root_directory = 'tst1'
+        target_root_directory = 'tst2'
+        with pytest.raises(Exception) as excinfo:
+            validate_directories_exist(root_directory, target_root_directory)
+        assert excinfo.value.args[0] == 'Target directory {0} does not exist!'.format(target_root_directory)
+
+    def test_validate_directories_exist__all_directories_valied__exception_thrown(self, mocker):
+        mocker.patch('os.path.isdir', MagicMock(side_effect=[True, True]))
+        root_directory = 'tst1'
+        target_root_directory = 'tst2'
+        assert validate_directories_exist(root_directory, target_root_directory)
+
     # TODO: Tests needed for process_images() and process_junk()
-    # TODO: pngfiles cause AttributeError: 'PngImageFile' object has no attribute '_getexif'
-    # TODO: Dude, .MOV files ... don't forget them ... all your live photos are .MOV files.
     # TODO: What video format does our digital camera produce by default?  might be helpful to know.
