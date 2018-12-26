@@ -42,7 +42,10 @@ def get_exif_time_original(file):
 def get_jpg_create_date(file):
     try:
         exif_date_time_original = get_exif_time_original(file)
-        create_date = datetime.strptime(exif_date_time_original, '%Y:%m:%d %H:%M:%S').date()
+        if not (exif_date_time_original.strip() == ''):
+            create_date = datetime.strptime(exif_date_time_original, '%Y:%m:%d %H:%M:%S').date()
+        else:
+            create_date = get_generic_create_date(file)
     except TypeError:
         create_date = get_generic_create_date(file)
 
