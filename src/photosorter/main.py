@@ -27,15 +27,15 @@ def get_directories_to_scan(root_directory, add_root_directory_to_list=False):
 def get_files_in_directory(scan_directory, files_of_type=FilesOfType.VALID_MEDIA):
     if files_of_type is FilesOfType.NON_VALID_MEDIA:
         files = [f for f in os.scandir(scan_directory)
-                 if (not magic.from_file(f.path, mime=True) in tuple(VALID_MIME_TYPES) and f.is_dir() is False)]
+                 if (f.is_dir() is False and not f.name.startswith('.') and not magic.from_file(f.path, mime=True) in tuple(VALID_MIME_TYPES))]
     elif files_of_type is FilesOfType.VALID_MEDIA:
         files = [f for f in os.scandir(scan_directory)
-                 if (magic.from_file(f.path, mime=True) in tuple(VALID_MIME_TYPES) and f.is_dir() is False)]
+                 if (f.is_dir() is False and not f.name.startswith('.') and magic.from_file(f.path, mime=True) in tuple(VALID_MIME_TYPES))]
     elif files_of_type is FilesOfType.FILES_AND_DIRECTORIES:
-        files = [f for f in os.scandir(scan_directory)]
+        files = [f for f in os.scandir(scan_directory) if (not f.name.startswith('.'))]
     else:
         files = [f for f in os.scandir(scan_directory)
-                 if (f.is_dir() is False)]
+                 if (f.is_dir() is False and not f.name.startswith('.'))]
 
     return files
 

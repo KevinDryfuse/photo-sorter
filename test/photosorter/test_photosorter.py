@@ -70,7 +70,8 @@ class TestPhotoSorter:
             PseudoDirEntry('DIRECTORY', '/filepath/', True, None),
             PseudoDirEntry('FILE2.JPG', '/filepath/', False, None),
             PseudoDirEntry('file3.jpg', '/filepath/', False, None),
-            PseudoDirEntry('file4.jpg', '/filepath\\FILE6.JPG', True, None)
+            PseudoDirEntry('file6.jpg', '/filepath\\FILE6.JPG', True, None),
+            PseudoDirEntry('.FILE7.JPG', '/filepath\\.FILE7.JPG', False, None)
         ]
         mocker.patch('os.scandir', MagicMock(return_value=file_list))
         mocker.patch('magic.from_file', MagicMock(return_value='image/jpeg'))
@@ -93,7 +94,8 @@ class TestPhotoSorter:
         file_list = [
             PseudoDirEntry('FILE1.JPG', '/filepath\\FILE1.JPG', True, None),
             PseudoDirEntry('DIRECTORY', '/filepath/', True, None),
-            PseudoDirEntry('FILE2.PNG', '/filepath\\FILE2.PNG', False, None)
+            PseudoDirEntry('FILE2.PNG', '/filepath\\FILE2.PNG', False, None),
+            PseudoDirEntry('.FILE7.JPG', '/filepath\\.FILE7.JPG', False, None)
         ]
         mocker.patch('os.scandir', MagicMock(return_value=file_list))
         mocker.patch('magic.from_file', MagicMock(return_value='image/png'))
@@ -106,7 +108,10 @@ class TestPhotoSorter:
 
     def test_get_files_in_directory__non_valid_media__non_valid_media_files_do_not_exist__return_empty_list(self,
                                                                                                             mocker):
-        mocker.patch('os.scandir', MagicMock(return_value=[PseudoDirEntry('DIRECTORY', '/filepath/', True, None)]))
+        mocker.patch('os.scandir', MagicMock(return_value=[
+            PseudoDirEntry('DIRECTORY', '/filepath/', True, None),
+            PseudoDirEntry('.FILE7.JPG', '/filepath\\.FILE7.JPG', False, None)
+        ]))
         mocker.patch('magic.from_file', MagicMock(return_value='image/png'))
 
         result = get_files_in_directory('directory_name', FilesOfType.NON_VALID_MEDIA)
@@ -120,7 +125,8 @@ class TestPhotoSorter:
             PseudoDirEntry('FILE3.JPG', '/filepath/', False, None),
             PseudoDirEntry('file4.png', '/filepath/', False, None),
             PseudoDirEntry('file5.jpg', '/filepath/', False, None),
-            PseudoDirEntry('file6.jpg', '/filepath\\FILE6.JPG', True, None)
+            PseudoDirEntry('file6.jpg', '/filepath\\FILE6.JPG', True, None),
+            PseudoDirEntry('.FILE7.JPG', '/filepath\\.FILE7.JPG', False, None)
         ]
         mocker.patch('os.scandir', MagicMock(return_value=file_list))
 
@@ -131,7 +137,10 @@ class TestPhotoSorter:
             assert (not file.is_dir())
 
     def test_get_files_in_directory__all_files__files_do_not_exist__return_empty_list(self, mocker):
-        mocker.patch('os.scandir', MagicMock(return_value=[PseudoDirEntry('DIRECTORY', '/filepath/', True, None)]))
+        mocker.patch('os.scandir', MagicMock(return_value=[
+            PseudoDirEntry('DIRECTORY', '/filepath/', True, None),
+            PseudoDirEntry('.FILE7.JPG', '/filepath\\.FILE7.JPG', False, None)
+        ]))
 
         result = get_files_in_directory('directory_name', FilesOfType.ALL_FILES)
         assert (result.__len__() == 0)
@@ -145,7 +154,8 @@ class TestPhotoSorter:
             PseudoDirEntry('FILE3.JPG', '/filepath/', False, None),
             PseudoDirEntry('file4.png', '/filepath/', False, None),
             PseudoDirEntry('file5.jpg', '/filepath/', False, None),
-            PseudoDirEntry('file6.jpg', '/filepath\\FILE6.JPG', True, None)
+            PseudoDirEntry('file6.jpg', '/filepath\\FILE6.JPG', True, None),
+            PseudoDirEntry('.FILE7.JPG', '/filepath\\.FILE7.JPG', False, None)
         ]
         mocker.patch('os.scandir', MagicMock(return_value=file_list))
 
