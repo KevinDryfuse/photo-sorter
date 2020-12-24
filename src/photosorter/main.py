@@ -5,12 +5,17 @@ from PIL import Image
 from datetime import datetime
 from src.photosorter.enums.file_of_type import *
 import magic
+import argparse
 
-VALID_MIME_TYPES = ['video/quicktime', 'image/jpeg', 'application/vnd.apple.photos', 'text/xml']
+VALID_MIME_TYPES = ['video/quicktime', 'image/jpeg', 'application/vnd.apple.photos', 'text/xml', 'video/x-msvideo', 'application/octet-stream', 'video/mp4']
+
+
+def listdir_nohidden(path):
+    return sorted(filter(lambda f: not f.startswith('.'), os.listdir(path)), key=lambda f: f.lower())
 
 
 def get_directories_to_scan(root_directory, add_root_directory_to_list=False):
-    child_directories = [os.path.join(root_directory, name) for name in os.listdir(root_directory)
+    child_directories = [os.path.join(root_directory, name) for name in listdir_nohidden(root_directory)
                          if os.path.isdir(os.path.join(root_directory, name))]
 
     if add_root_directory_to_list:
@@ -22,15 +27,15 @@ def get_directories_to_scan(root_directory, add_root_directory_to_list=False):
 def get_files_in_directory(scan_directory, files_of_type=FilesOfType.VALID_MEDIA):
     if files_of_type is FilesOfType.NON_VALID_MEDIA:
         files = [f for f in os.scandir(scan_directory)
-                 if (not magic.from_file(f.path, mime=True) in tuple(VALID_MIME_TYPES) and f.is_dir() is False)]
+                 if (f.is_dir() is False and not f.name.startswith('.') and not magic.from_file(f.path, mime=True) in tuple(VALID_MIME_TYPES))]
     elif files_of_type is FilesOfType.VALID_MEDIA:
         files = [f for f in os.scandir(scan_directory)
-                 if (magic.from_file(f.path, mime=True) in tuple(VALID_MIME_TYPES) and f.is_dir() is False)]
+                 if (f.is_dir() is False and not f.name.startswith('.') and magic.from_file(f.path, mime=True) in tuple(VALID_MIME_TYPES))]
     elif files_of_type is FilesOfType.FILES_AND_DIRECTORIES:
-        files = [f for f in os.scandir(scan_directory)]
+        files = [f for f in os.scandir(scan_directory) if (not f.name.startswith('.'))]
     else:
         files = [f for f in os.scandir(scan_directory)
-                 if (f.is_dir() is False)]
+                 if (f.is_dir() is False and not f.name.startswith('.'))]
 
     return files
 
@@ -42,7 +47,10 @@ def get_exif_time_original(file):
 def get_jpg_create_date(file):
     try:
         exif_date_time_original = get_exif_time_original(file)
-        create_date = datetime.strptime(exif_date_time_original, '%Y:%m:%d %H:%M:%S').date()
+        if not (exif_date_time_original.strip() == ''):
+            create_date = datetime.strptime(exif_date_time_original, '%Y:%m:%d %H:%M:%S').date()
+        else:
+            create_date = get_generic_create_date(file)
     except TypeError:
         create_date = get_generic_create_date(file)
 
@@ -84,9 +92,21 @@ def move_file(target_directory, file):
         os.rename(file.path, target_directory + '\\' + file.name)
 
 
-def process_media(root_directory, target_root_directory):
+def determine_target_directory_location(target_root_directory, date_file_created, junk=None):
+    if junk is None:
+        target_directory = target_root_directory + '\\' + str(date_file_created)
+    else:
+        junk_directory = target_root_directory + '\\JUNK/'
+
+        create_target_directory(junk_directory)
+
+        target_directory = junk_directory + '\\' + str(date_file_created)
+
+    return target_directory
+
+
+def process_media(directories_to_scan, target_root_directory):
     print('Processing media files')
-    directories_to_scan = get_directories_to_scan(root_directory)
 
     for current_directory in directories_to_scan:
 
@@ -97,16 +117,15 @@ def process_media(root_directory, target_root_directory):
         for image in images:
             date_photo_taken = get_create_date(image)
 
-            target_directory = target_root_directory + '\\' + str(date_photo_taken)
+            target_directory = determine_target_directory_location(target_root_directory, date_photo_taken)
 
             create_target_directory(target_directory)
 
             move_file(target_directory, image)
 
 
-def process_junk(root_directory, target_root_directory):
+def process_junk(directories_to_scan, target_root_directory, junk):
     print('Processing non media files')
-    directories_to_scan = get_directories_to_scan(root_directory)
 
     for current_directory in directories_to_scan:
 
@@ -117,11 +136,7 @@ def process_junk(root_directory, target_root_directory):
         for file in files:
             date_file_created = get_create_date(file)
 
-            junk_directory = target_root_directory + '\\JUNK/'
-
-            create_target_directory(junk_directory)
-
-            target_directory = junk_directory + '\\' + str(date_file_created)
+            target_directory = determine_target_directory_location(target_root_directory, date_file_created, junk)
 
             create_target_directory(target_directory)
 
@@ -145,16 +160,10 @@ def cleanup(root_directory):
 
 
 # Validate that the directories actually exist
-def get_directories(args):
+def get_directories(root_directory, target_root_directory):
 
-    if args.__len__() == 1:
-        raise Exception('Root directory parameter not supplied.')
-    elif args.__len__() == 2:
-        root_directory = args[1]
+    if target_root_directory == None:
         target_root_directory = root_directory
-    elif args.__len__() >= 3:
-        root_directory = args[1]
-        target_root_directory = args[2]
 
     return root_directory, target_root_directory
 
@@ -169,15 +178,21 @@ def validate_directories_exist(root_directory, target_root_directory):
 
 
 if __name__ == "__main__":
-
-    root_directory, target_root_directory = get_directories(sys.argv)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-j', '--junk', action='store_const', const=True, help="Excludes possible junk for manual review")
+    parser.add_argument('scan_directory', help="Location of the media that your want to sort.")
+    parser.add_argument('-t', '--target', help="Target location for sorted media")
+    args = parser.parse_args()
+    root_directory, target_root_directory = get_directories(args.scan_directory, args.target)
 
     print("Root directory to scan: " + str(root_directory))
-    print("Root directory to scan: " + str(root_directory))
+    print("Destination directory for files: " + str(target_root_directory))
 
-    process_media(root_directory, target_root_directory)
+    directories_to_scan = get_directories_to_scan(root_directory)
 
-    process_junk(root_directory, target_root_directory)
+    process_media(directories_to_scan, target_root_directory)
+
+    process_junk(directories_to_scan, target_root_directory, args.junk)
 
     cleanup(root_directory)
 
