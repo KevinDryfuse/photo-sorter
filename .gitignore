@@ -17,6 +17,8 @@ __pycache__/
 .idea/sqlDataSources.xml
 .idea/dynamic.xml
 .idea/uiDesigner.xml
+.idea/PhotoSorter.iml
+.idea/misc.xml
 
 # Distribution / packaging
 .Python
@@ -104,6 +106,7 @@ celerybeat-schedule
 .venv
 env/
 venv/
+venv*/
 ENV/
 env.bak/
 venv.bak/

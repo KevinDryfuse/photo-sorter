@@ -1,9 +1,8 @@
 __author__ = 'github.com/kevindryfuse'
-import sys
 import os
 from PIL import Image
 from datetime import datetime
-from src.photosorter.enums.file_of_type import *
+from src.photosorter.enums.file_of_type import FilesOfType
 import magic
 import argparse
 
